@@ -7,6 +7,8 @@ import textwrap
 import sys
 from urllib.parse import urlparse
 import urllib.request
+from multiprocessing import Pool
+
 
 import re
 import html2text
@@ -127,8 +129,28 @@ def convert_to_markdown(page_soup, current_url):
 
     # TODO: repalce all links within the same domain to new link format
 
+    ### create the jekyll header
+    
+    # find the first heading
+    article_title = ""
+    for line in article_md_attachmentsfix.split('\n'):
+        if line.startswith('#'):
+            # Tracer()()
+            try:
+                article_title = re.match('^#+(.*$)', line).groups(0)[0].strip().capitalize()
+            except AttributeError:
+                article_title = ""
+            break
+
+    jekyll_header = """---
+layout: two_puff
+title:  '{}'
+---
+    """.format(article_title)
+
     # write md file
     with open(os.path.join(*[args.output]+ re.split('/+', current_path)[:-1]+ [page_name+".md"]), 'w') as article_file:
+        article_file.write(jekyll_header)
         article_file.write(article_md_attachmentsfix)
 
     return 1
@@ -161,7 +183,7 @@ if root_path == '': # empty root path is rewritten as a relative path starting a
 
 # init
 root_url = root_scheme+"://"+root_host+'/'+root_path
-url_memory = {root_url:'root'}
+url_memory = dict()
 url_queue = {root_url:'root'}
 url_rejected  = dict()
 url_converted  = dict()
