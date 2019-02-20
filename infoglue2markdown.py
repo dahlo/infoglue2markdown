@@ -7,13 +7,15 @@ import textwrap
 import sys
 from urllib.parse import urlparse
 import urllib.request
-from multiprocessing import Pool
+# from multiprocessing import Pool
 
 
 import re
 import html2text
 import pathlib
 import os
+# from tomd import Tomd
+
 
 from IPython.core.debugger import Tracer
 
@@ -113,18 +115,20 @@ def convert_to_markdown(page_soup, current_url):
         return None
 
     article_md = md_maker.handle(article_html)
+    # article_md = Tomd(article_html).markdown
 
     # create output dir and download all attachments in the article
     # Tracer()()
     pathlib.Path(os.path.join(*[args.output]+ re.split('/+', current_path)[:-1]+ ['files'])).mkdir(parents=True, exist_ok=True)
     for file in re.findall( '\((\/digitalAssets\S+)\)', article_md):
-        file_url = '/'.join([root_url, file])
+        # Tracer()()
+        file_url = "{}://{}/{}".format(root_scheme, root_host, file)
         file_name = file.split('/')[-1]
         # print('/'.join([root_url, img]))
         urllib.request.urlretrieve(file_url, os.path.join(*[args.output]+ re.split('/+', current_path)[:-1]+ ['files', file_name]))
 
     # replace all image links to new format
-    article_md_attachmentsfix = re.sub(  '\/digitalAssets\/\S+\/(\S+\.\S+)\)', r'files/\1)',   article_md  )
+    article_md_attachmentsfix = re.sub(  '\/digitalAssets\/\S+\/(\S+\.\S+)', r'files/\1',   article_md  )
 
 
     # TODO: repalce all links within the same domain to new link format
@@ -191,8 +195,9 @@ url_converted  = dict()
 # create the markdown converter and set some options (https://github.com/Alir3z4/html2text/blob/master/docs/usage.md)
 md_maker = html2text.HTML2Text()
 md_maker.body_width = 0 # don't wrap lines by inserting \n everywhere
-md_maker.ignore_images = True # keep image links as html to avoid losing the html size properties
-md_maker.bypass_tables = True # keep tables as html format
+md_maker.images_with_size = True # keep image links as html to avoid losing the html size properties
+md_maker.protect_links = True
+# md_maker.bypass_tables = True # keep tables as html format
 
 # Tracer()()
 
