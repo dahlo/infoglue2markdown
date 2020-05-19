@@ -17,7 +17,7 @@ import os
 # from tomd import Tomd
 
 
-from IPython.core.debugger import Tracer
+# from IPython.core.debugger import Tracer
 
 
 
@@ -58,7 +58,7 @@ def harvest_new_urls(soup, url_memory, url_queue, url_rejected):
             url_memory[current_link] = current_url
             continue
 
-        # skip link that are not absolute (usually unrenderedinfoglue internal links like $templateId=4.....)
+        # skip link that are not absolute (usually unrendered infoglue internal links like $templateId=4.....)
         if current_path[0] != '/':
             url_rejected[current_link] = [current_url, 'invalid path']
             url_memory[current_link] = current_url
