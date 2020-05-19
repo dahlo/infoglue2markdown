@@ -105,6 +105,8 @@ def convert_to_markdown(page_soup, current_url):
 
     # save the name of the page
     page_name = current_path.strip('/').split('/')[-1]
+    if page_name == '':
+        page_name = 'index'
 
     # break out the article contents and convert it to markdown
     try:
@@ -146,9 +148,12 @@ def convert_to_markdown(page_soup, current_url):
                 article_title = ""
             break
 
+    # excape weird stuff
+    article_title = article_title.replace("\"", "\\\"")
+    article_title = article_title.replace("\'", "\\\'")
+
     jekyll_header = """---
-layout: two_puff
-title:  '{}'
+title:  "{}"
 ---
     """.format(article_title)
 
