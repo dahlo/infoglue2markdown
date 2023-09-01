@@ -8,7 +8,7 @@ import sys
 from urllib.parse import urlparse
 import urllib.request
 # from multiprocessing import Pool
-
+import pdb
 
 import re
 import html2text
@@ -17,21 +17,23 @@ import os
 # from tomd import Tomd
 
 
-# from IPython.core.debugger import Tracer
-import pdb
+from IPython.core.debugger import Tracer
 
 
-def sanitize(text):
-    return
 
 
 
 def harvest_new_urls(soup, url_memory, url_queue, url_rejected):
-
+    
     # go throguh all link in the page
     for link in soup.find_all('a', href=True):
 
-        current_scheme, current_host, current_path = urlparse(link.attrs['href'])[:3]
+        # skip failed links
+        try:
+            current_scheme, current_host, current_path = urlparse(link.attrs['href'])[:3]
+        except:
+            print(f"FAILED URL: {link.encode('utf8')}")
+            continue
 
         # make relative links absolute
         if current_scheme == '':
@@ -61,11 +63,11 @@ def harvest_new_urls(soup, url_memory, url_queue, url_rejected):
             url_memory[current_link] = current_url
             continue
 
-        # skip link that are not absolute (usually unrendered infoglue internal links like $templateId=4.....)
-        if current_path[0] != '/':
-            url_rejected[current_link] = [current_url, 'invalid path']
-            url_memory[current_link] = current_url
-            continue
+        # skip link that are not absolute (usually unrenderedinfoglue internal links like $templateId=4.....)
+        #if current_path[0] != '/':
+        #    url_rejected[current_link] = [current_url, 'invalid path']
+        #    url_memory[current_link] = current_url
+        #    continue
 
         # make sure the url is under the same subfolder as the root url
         if not current_path.startswith(root_path):
@@ -75,9 +77,12 @@ def harvest_new_urls(soup, url_memory, url_queue, url_rejected):
 
         # skip links to files with file endings, handle attachments when the conversion takes place
         if re.search('\.\w+$', current_path):
-            url_rejected[current_link] = [current_url, 'is an attachment/file']
-            url_memory[current_link] = current_url
-            continue
+
+            # allow html files
+            if not current_path.endswith('html') and not current_path.endswith('htm'):
+                url_rejected[current_link] = [current_url, 'is an attachment/file']
+                url_memory[current_link] = current_url
+                continue
         
         # a new link to process, add it to the queue and memory
         url_queue[current_link] = current_url
@@ -108,15 +113,15 @@ def convert_to_markdown(page_soup, current_url):
 
     # save the name of the page
     page_name = current_path.strip('/').split('/')[-1]
-    if page_name == '':
-        page_name = 'index'
 
     # break out the article contents and convert it to markdown
     try:
-        article_html = str(page_soup.find_all('article')[0])
+        article_html = ""
+        for div in page_soup.find_all("div", {"class":"container"}):
+            article_html += str(div)
     except IndexError:
         # if the page doesn't have an article section, skip it
-        print("WARNING: {} missing article section".format(current_url))
+        print("WARNING: {} missing 'container' section".format(current_url))
         return None
 
     article_md = md_maker.handle(article_html)
@@ -124,7 +129,7 @@ def convert_to_markdown(page_soup, current_url):
 
     # create output dir and download all attachments in the article
     # Tracer()()
-    pathlib.Path(os.path.join(*[args.output]+ re.split('/+', current_path)[:-1]+ ['files'])).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(os.path.join(*[args.output]+ re.split('/+', current_path)[:-1]+ [page_name])).mkdir(parents=True, exist_ok=True)
     for file in re.findall( '\((\/digitalAssets\S+)\)', article_md):
         # Tracer()()
         file_url = "{}://{}/{}".format(root_scheme, root_host, file)
@@ -151,20 +156,17 @@ def convert_to_markdown(page_soup, current_url):
                 article_title = ""
             break
 
-    # excape weird stuff
-    article_title = article_title.replace("\"", "\\\"")
-    article_title = article_title.replace("\'", "\\\'")
-
     jekyll_header = """---
-title:  "{}"
+title:  '{}'
+visible: true
 ---
     """.format(article_title)
 
-    # write md file
-    with open(os.path.join(*[args.output]+ re.split('/+', current_path)[:-1]+ [page_name+".md"]), 'w', encoding='utf-8') as article_file:
-
-        article_file.write(jekyll_header)
-        article_file.write(article_md_attachmentsfix)
+    if not args.dryrun:
+        # write md file
+        with open(os.path.join(*[args.output]+ re.split('/+', current_path)[:-1]+ [page_name]+["default.md"]), 'w', encoding='utf-8') as article_file:
+            article_file.write(jekyll_header)
+            article_file.write(article_md_attachmentsfix)
 
     return 1
 
@@ -186,6 +188,7 @@ parser.add_argument("-o", "--outputdir", dest='output', type=str, help="Output f
 parser.add_argument('-r', '--rejected', dest='rejected', action='store_true', help="Print a list of all rejected urls, along with why they were rejected and where they were first seen.")
 parser.add_argument('-s', '--silent', dest='silent', action='store_true', help="Supress the progress reporting while running.")
 parser.add_argument('-c', '--converted', dest='converted', action='store_true', help="Print a list of all converted urls and where they were first seen.")
+parser.add_argument('-d', '--dryrun', dest='dryrun', action='store_true', help="Dry run, does not produce any output files.")
 args = parser.parse_args()
 
 
